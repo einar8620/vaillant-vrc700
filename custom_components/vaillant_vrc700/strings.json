@@ -93,6 +93,9 @@
     "switch": {
       "manual_cooling": { "name": "Manual Cooling" },
       "hot_water_boost": { "name": "Hot Water Boost" }
+    },
+    "button": {
+      "refresh": { "name": "Refresh" }
     }
   }
 }

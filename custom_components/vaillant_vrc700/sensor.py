@@ -164,6 +164,12 @@ SENSORS: tuple[VRC700SensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: d.request_count,
+        attributes_fn=lambda d: {
+            "quota_paused": d.quota_paused_until is not None,
+            "quota_paused_until": str(d.quota_paused_until)
+            if d.quota_paused_until
+            else None,
+        },
     ),
 )
 

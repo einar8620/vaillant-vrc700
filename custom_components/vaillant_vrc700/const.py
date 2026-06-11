@@ -10,10 +10,22 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.NUMBER,
     Platform.SWITCH,
+    Platform.BUTTON,
 ]
 
 # Seconds to wait after a write (API returns 202 async) before re-polling
 WRITE_REFRESH_DELAY = 8
+
+# Connection-status + trouble-codes are fetched only every Nth poll cycle
+# (the quota is roughly ~100 calls/hour; this keeps most cycles at 1 call)
+AUX_FETCH_EVERY_CYCLES = 6
+
+# Safety margin added to the server-reported quota replenish time
+QUOTA_PAUSE_MARGIN = 60  # seconds
+QUOTA_PAUSE_FALLBACK = 1800  # if the replenish time can't be parsed
+
+# Minimum seconds between presses of the refresh button
+REFRESH_BUTTON_COOLDOWN = 60
 
 CONF_BRAND = "brand"
 CONF_COUNTRY = "country"
