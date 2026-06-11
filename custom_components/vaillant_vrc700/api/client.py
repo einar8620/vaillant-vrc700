@@ -28,6 +28,10 @@ API_BASE = "https://api.vaillant-group.com/service-connected-control"
 # Shared by all myVAILLANT clients (from the official app).
 SUBSCRIPTION_KEY = "1e0a2f3511fb4c5bbb1c7f9fedd20b1c"
 
+# Hard timeout on every request. Without this, a hanging server response
+# (seen during hard rate-limiting) blocks the coordinator forever.
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
+
 HEATING_MODES = ("AUTO", "DAY", "SET_BACK", "OFF")
 COOLING_MODES = ("AUTO", "DAY", "OFF")
 DHW_MODES = ("AUTO", "DAY", "OFF")
@@ -78,7 +82,7 @@ class VRC700Client:
         }
         self.request_count += 1
         async with self._session.request(
-            method, url, json=json, headers=headers
+            method, url, json=json, headers=headers, timeout=REQUEST_TIMEOUT
         ) as resp:
             body = await resp.text()
             if resp.status in (200, 201, 202, 204):

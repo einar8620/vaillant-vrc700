@@ -31,6 +31,9 @@ TOKEN_URL = IDENTITY_BASE + "/protocol/openid-connect/token"
 # Refresh the access token this many seconds before it actually expires.
 TOKEN_EXPIRY_MARGIN = 180
 
+# Hard timeout on every auth request (login page, credentials POST, token).
+AUTH_TIMEOUT = aiohttp.ClientTimeout(total=30)
+
 _FORM_ACTION_RE = re.compile(r'<form[^>]*\saction="([^"]+)"', re.IGNORECASE)
 
 
@@ -103,7 +106,9 @@ class VaillantAuth:
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
         }
-        async with self._session.get(auth_url, params=params) as resp:
+        async with self._session.get(
+            auth_url, params=params, timeout=AUTH_TIMEOUT
+        ) as resp:
             if resp.status != 200:
                 raise AuthenticationError(
                     f"Keycloak auth page returned HTTP {resp.status} "
@@ -127,6 +132,7 @@ class VaillantAuth:
                 "credentialId": "",
             },
             allow_redirects=False,
+            timeout=AUTH_TIMEOUT,
         ) as resp:
             location = resp.headers.get("Location", "")
             if resp.status != 302 or "code=" not in location:
@@ -159,7 +165,9 @@ class VaillantAuth:
 
     async def _request_token(self, data: dict) -> None:
         token_url = TOKEN_URL.format(realm=self.realm)
-        async with self._session.post(token_url, data=data) as resp:
+        async with self._session.post(
+            token_url, data=data, timeout=AUTH_TIMEOUT
+        ) as resp:
             if resp.status != 200:
                 body = await resp.text()
                 raise AuthenticationError(
