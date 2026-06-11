@@ -1,0 +1,60 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to myVAILLANT",
+        "data": {
+          "import_from_mypyllant": "Use credentials from the existing myVAILLANT (mypyllant) integration",
+          "username": "Email",
+          "password": "Password",
+          "brand": "Brand",
+          "country": "Country (e.g. spain, germany)"
+        }
+      },
+      "select_system": {
+        "title": "Select your VRC 700 system",
+        "data": { "system_id": "System" }
+      }
+    },
+    "error": {
+      "missing_credentials": "Enter your myVAILLANT email and password (or tick the import option).",
+      "invalid_auth": "Login failed — check email, password, brand and country.",
+      "cannot_connect": "Could not reach the myVAILLANT API.",
+      "no_vrc700_system": "No VRC 700 system found on this account (only VRC 700 controllers are supported)."
+    },
+    "abort": {
+      "already_configured": "This VRC 700 system is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "VRC 700 options",
+        "data": {
+          "update_interval": "Polling interval (seconds)",
+          "boost_duration_minutes": "Hot water boost duration (minutes)",
+          "manual_cooling_default_days": "Manual cooling default duration (days)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "system_status": { "name": "System Status" },
+      "outside_temperature": { "name": "Outside Temperature" },
+      "outside_temperature_avg_24h": { "name": "Outside Temperature 24h Average" },
+      "indoor_temperature": { "name": "Indoor Temperature" },
+      "indoor_humidity": { "name": "Indoor Humidity" },
+      "flow_temperature": { "name": "Flow Temperature" },
+      "water_pressure": { "name": "Water Pressure" },
+      "dhw_temperature": { "name": "Hot Water Temperature" },
+      "dhw_status": { "name": "Hot Water Status" },
+      "error_codes": { "name": "Error Codes" },
+      "api_request_count": { "name": "API Request Count" }
+    },
+    "binary_sensor": {
+      "online": { "name": "Online" },
+      "problem": { "name": "Problem" }
+    }
+  }
+}

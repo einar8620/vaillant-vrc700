@@ -8,8 +8,8 @@ Built because the VRC 700 operates differently from modern (TLI) controllers: he
 
 | Phase | Scope | Status |
 |---|---|---|
-| A | Standalone API client (`api/`) + CLI test script | 🔨 in progress |
-| B | Integration skeleton, config flow, read-only sensors | ⏳ |
+| A | Standalone API client (`api/`) + CLI test script | ✅ live-verified 2026-06-11 |
+| B | Integration skeleton, config flow, read-only sensors | 🔨 in progress |
 | C | Controls (modes, temperatures, manual cooling, DHW boost) | ⏳ |
 | D | Options flow, quota backoff, diagnostics | ⏳ |
 | E | Production cutover | ⏳ |
