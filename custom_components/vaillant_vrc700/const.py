@@ -4,7 +4,16 @@ from homeassistant.const import Platform
 
 DOMAIN = "vaillant_vrc700"
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.SELECT,
+    Platform.NUMBER,
+    Platform.SWITCH,
+]
+
+# Seconds to wait after a write (API returns 202 async) before re-polling
+WRITE_REFRESH_DELAY = 8
 
 CONF_BRAND = "brand"
 CONF_COUNTRY = "country"

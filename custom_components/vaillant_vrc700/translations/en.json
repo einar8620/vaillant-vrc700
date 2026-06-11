@@ -55,6 +55,44 @@
     "binary_sensor": {
       "online": { "name": "Online" },
       "problem": { "name": "Problem" }
+    },
+    "select": {
+      "heating_mode": {
+        "name": "Heating Mode",
+        "state": {
+          "auto": "Auto",
+          "day": "Day",
+          "set_back": "Set-back",
+          "off": "Off"
+        }
+      },
+      "cooling_mode": {
+        "name": "Cooling Mode",
+        "state": {
+          "auto": "Auto",
+          "day": "Day",
+          "off": "Off"
+        }
+      },
+      "dhw_mode": {
+        "name": "Hot Water Mode",
+        "state": {
+          "auto": "Auto",
+          "day": "Day",
+          "off": "Off"
+        }
+      }
+    },
+    "number": {
+      "heating_day_temperature": { "name": "Heating Day Temperature" },
+      "heating_setback_temperature": { "name": "Heating Setback Temperature" },
+      "cooling_day_temperature": { "name": "Cooling Day Temperature" },
+      "dhw_setpoint": { "name": "Hot Water Setpoint" },
+      "manual_cooling_days": { "name": "Manual Cooling Days" }
+    },
+    "switch": {
+      "manual_cooling": { "name": "Manual Cooling" },
+      "hot_water_boost": { "name": "Hot Water Boost" }
     }
   }
 }

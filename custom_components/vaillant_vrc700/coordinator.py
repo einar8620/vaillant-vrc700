@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -12,7 +14,15 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import ApiError, AuthenticationError, QuotaExceededError, VRC700Client, VRC700System
-from .const import CONF_SYSTEM_ID, CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL, DOMAIN
+from .const import (
+    CONF_MANUAL_COOLING_DAYS,
+    CONF_SYSTEM_ID,
+    CONF_UPDATE_INTERVAL,
+    DEFAULT_MANUAL_COOLING_DAYS,
+    DEFAULT_UPDATE_INTERVAL,
+    DOMAIN,
+    WRITE_REFRESH_DELAY,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,6 +45,11 @@ class VRC700Coordinator(DataUpdateCoordinator[VRC700Data]):
     ) -> None:
         self.client = client
         self.system_id: str = entry.data[CONF_SYSTEM_ID]
+        # Days used when the manual-cooling switch is turned on (set via number entity)
+        self.manual_cooling_days_setting: int = entry.options.get(
+            CONF_MANUAL_COOLING_DAYS, DEFAULT_MANUAL_COOLING_DAYS
+        )
+        self._write_refresh_task: asyncio.Task | None = None
         interval = entry.options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
         super().__init__(
             hass,
@@ -72,3 +87,30 @@ class VRC700Coordinator(DataUpdateCoordinator[VRC700Data]):
             trouble_codes=codes,
             request_count=self.client.request_count,
         )
+
+    # ------------------------------------------------------------ writes
+
+    async def async_write(
+        self,
+        request: Awaitable,
+        mutate: Callable[[VRC700Data], None] | None = None,
+    ) -> None:
+        """Run a write request, optimistically update state, refresh later.
+
+        The cloud API returns 202 (applied asynchronously), so we mutate our
+        local model immediately for a responsive UI, then re-poll after
+        WRITE_REFRESH_DELAY seconds to confirm.
+        """
+        await request
+        if mutate and self.data:
+            mutate(self.data)
+            self.async_update_listeners()
+        if self._write_refresh_task and not self._write_refresh_task.done():
+            self._write_refresh_task.cancel()
+        self._write_refresh_task = self.hass.async_create_task(
+            self._refresh_after_write()
+        )
+
+    async def _refresh_after_write(self) -> None:
+        await asyncio.sleep(WRITE_REFRESH_DELAY)
+        await self.async_request_refresh()
