@@ -33,6 +33,7 @@ from .const import (
     DEFAULT_MANUAL_COOLING_DAYS,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
+    OPTIMISTIC_HOLD_SECONDS,
     QUOTA_PAUSE_FALLBACK,
     QUOTA_PAUSE_MARGIN,
     WRITE_REFRESH_DELAY,
@@ -62,6 +63,21 @@ class VRC700Data:
     quota_paused_until: datetime | None = None
 
 
+@dataclass
+class _OptimisticHold:
+    """Re-applies an optimistic mutation until the API confirms it.
+
+    Writes return 202 (async) and the backend can take longer than
+    WRITE_REFRESH_DELAY to reflect them — without this, the post-write
+    refresh overwrites the optimistic state with stale data (e.g. the
+    hot-water-boost switch flipping back off ~8 s after turn-on).
+    """
+
+    mutate: Callable[["VRC700Data"], None]
+    verify: Callable[["VRC700Data"], bool]
+    until: datetime
+
+
 class VRC700Coordinator(DataUpdateCoordinator[VRC700Data]):
     """Polls the myVAILLANT cloud for one VRC 700 system."""
 
@@ -79,6 +95,7 @@ class VRC700Coordinator(DataUpdateCoordinator[VRC700Data]):
         self._last_connected = False
         self._last_codes: list[str] = []
         self._write_refresh_task: asyncio.Task | None = None
+        self._holds: list[_OptimisticHold] = []
         interval = entry.options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
         super().__init__(
             hass,
@@ -155,13 +172,32 @@ class VRC700Coordinator(DataUpdateCoordinator[VRC700Data]):
             raise UpdateFailed(f"API error: {err}") from err
 
         self.quota_paused_until = None
-        return VRC700Data(
+        data = VRC700Data(
             system=system,
             connected=self._last_connected,
             trouble_codes=self._last_codes,
             request_count=self.client.request_count,
             quota_paused_until=None,
         )
+        self._apply_holds(data)
+        return data
+
+    def _apply_holds(self, data: VRC700Data) -> None:
+        """Keep optimistic write state until the API confirms or hold expires."""
+        now = dt_util.utcnow()
+        keep: list[_OptimisticHold] = []
+        for hold in self._holds:
+            if hold.verify(data):
+                continue  # API confirmed the write — hold no longer needed
+            if now >= hold.until:
+                _LOGGER.warning(
+                    "Optimistic hold expired without API confirmation — "
+                    "accepting API state"
+                )
+                continue
+            hold.mutate(data)
+            keep.append(hold)
+        self._holds = keep
 
     # ------------------------------------------------------------ writes
 
@@ -169,8 +205,15 @@ class VRC700Coordinator(DataUpdateCoordinator[VRC700Data]):
         self,
         request: Awaitable,
         mutate: Callable[[VRC700Data], None] | None = None,
+        verify: Callable[[VRC700Data], bool] | None = None,
+        hold_seconds: int = OPTIMISTIC_HOLD_SECONDS,
     ) -> None:
-        """Run a write request, optimistically update state, refresh later."""
+        """Run a write request, optimistically update state, refresh later.
+
+        If ``verify`` is given, the optimistic ``mutate`` is re-applied on
+        every refresh until ``verify(data)`` is True or ``hold_seconds``
+        elapse (guards against the 202-async backend lag).
+        """
         if self.quota_paused:
             request.close()  # don't leave the coroutine un-awaited
             raise HomeAssistantError(
@@ -188,6 +231,14 @@ class VRC700Coordinator(DataUpdateCoordinator[VRC700Data]):
         if mutate and self.data:
             mutate(self.data)
             self.async_update_listeners()
+            if verify is not None:
+                self._holds.append(
+                    _OptimisticHold(
+                        mutate=mutate,
+                        verify=verify,
+                        until=dt_util.utcnow() + timedelta(seconds=hold_seconds),
+                    )
+                )
         if self._write_refresh_task and not self._write_refresh_task.done():
             self._write_refresh_task.cancel()
         self._write_refresh_task = self.hass.async_create_task(

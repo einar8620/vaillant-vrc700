@@ -16,6 +16,10 @@ PLATFORMS: list[Platform] = [
 # Seconds to wait after a write (API returns 202 async) before re-polling
 WRITE_REFRESH_DELAY = 8
 
+# Re-apply optimistic write state on refreshes until the API confirms it,
+# for at most this long (202-async writes can lag well past the refresh delay)
+OPTIMISTIC_HOLD_SECONDS = 90
+
 # Connection-status + trouble-codes are fetched only every Nth poll cycle
 # (the quota is roughly ~100 calls/hour; this keeps most cycles at 1 call)
 AUX_FETCH_EVERY_CYCLES = 6

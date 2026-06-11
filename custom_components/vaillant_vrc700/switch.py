@@ -113,11 +113,16 @@ class VRC700HotWaterBoost(VRC700Entity, SwitchEntity):
             if data.system.primary_dhw:
                 data.system.primary_dhw.special_function = "CYLINDER_BOOST"
 
+        def verify(data) -> bool:
+            dhw = data.system.primary_dhw
+            return bool(dhw and dhw.special_function == "CYLINDER_BOOST")
+
         await coordinator.async_write(
             coordinator.client.start_dhw_boost(
                 coordinator.system_id, dhw_index=self._dhw_index()
             ),
             mutate,
+            verify=verify,
         )
         self._cancel_auto_off()
         self._cancel_timer = async_call_later(
@@ -140,11 +145,16 @@ class VRC700HotWaterBoost(VRC700Entity, SwitchEntity):
             if data.system.primary_dhw:
                 data.system.primary_dhw.special_function = "NONE"
 
+        def verify(data) -> bool:
+            dhw = data.system.primary_dhw
+            return bool(dhw and dhw.special_function != "CYLINDER_BOOST")
+
         await coordinator.async_write(
             coordinator.client.stop_dhw_boost(
                 coordinator.system_id, dhw_index=self._dhw_index()
             ),
             mutate,
+            verify=verify,
         )
 
     async def async_will_remove_from_hass(self) -> None:
