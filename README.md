@@ -6,16 +6,33 @@ Built because the VRC 700 operates differently from modern (TLI) controllers: he
 
 ## Status
 
+Running in production on a live VRC 700 R6 system since 2026-06-11 (mypyllant fully replaced).
+
 | Phase | Scope | Status |
 |---|---|---|
-| A | Standalone API client (`api/`) + CLI test script | ✅ live-verified 2026-06-11 |
-| B | Integration skeleton, config flow, read-only sensors | 🔨 in progress |
-| C | Controls (modes, temperatures, manual cooling, DHW boost) | ⏳ |
-| D | Options flow, quota backoff, diagnostics | ⏳ |
-| E | Production cutover | ⏳ |
-| F | HACS publication | ⏳ |
+| A | Standalone API client (`api/`) + CLI test script | ✅ live-verified |
+| B | Integration skeleton, config flow, read-only sensors | ✅ done |
+| C | Controls (modes, temperatures, manual cooling, DHW boost) | ✅ done |
+| D | Options flow, quota backoff, diagnostics | ✅ done |
+| E | Production cutover | ✅ done (v0.4.1) |
+| F | HACS publication | 🔨 in progress |
 
-## Planned entities
+## Installation
+
+**Via HACS (custom repository):**
+
+1. HACS → ⋮ → **Custom repositories**.
+2. Add `https://github.com/einar8620/vaillant-vrc700`, category **Integration**.
+3. Find **Vaillant VRC 700** in HACS, **Download**, then restart Home Assistant.
+4. Settings → Devices & Services → **Add Integration** → "Vaillant VRC 700" → enter your myVAILLANT credentials.
+
+**Manual:** copy `custom_components/vaillant_vrc700` into your HA `config/custom_components/`, restart, then add the integration.
+
+## Configuration
+
+Config flow only — no YAML. You provide your myVAILLANT account email + password (the same credentials as the myVAILLANT app). The integration polls the myVAILLANT cloud (`cloud_polling`) with quota-aware backoff.
+
+## Entities
 
 Granular entities only (no `climate` entity — the VRC 700's independent heating/cooling model doesn't fit it):
 
