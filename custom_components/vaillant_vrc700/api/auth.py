@@ -9,9 +9,11 @@ Flow adapted from myPyllant (MIT, (c) 2023 Philipp Doerner).
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import html as html_lib
+import json
 import logging
 import re
 import secrets
@@ -27,6 +29,7 @@ REDIRECT_URI = "enduservaillant.page.link://login"
 IDENTITY_BASE = "https://identity.vaillant-group.com/auth/realms/{realm}"
 AUTHENTICATE_URL = IDENTITY_BASE + "/protocol/openid-connect/auth"
 TOKEN_URL = IDENTITY_BASE + "/protocol/openid-connect/token"
+ALTCHA_CHALLENGE_URL = "https://identity.vaillant-group.com/api/altcha/challenge"
 
 # Refresh the access token this many seconds before it actually expires.
 TOKEN_EXPIRY_MARGIN = 180
@@ -39,6 +42,53 @@ _FORM_ACTION_RE = re.compile(r'<form[^>]*\saction="([^"]+)"', re.IGNORECASE)
 
 class AuthenticationError(Exception):
     """Raised when login or token refresh fails."""
+
+
+def solve_altcha_challenge(challenge: dict) -> str:
+    """Solve the ALTCHA proof-of-work challenge served by Vaillant's login page.
+
+    Vaillant added an ALTCHA check to Keycloak (identity.vaillant-group.com);
+    the credentials POST is rejected unless it carries a solved challenge in
+    the "altcha" form field. This brute-forces the PBKDF2 proof-of-work and
+    packages the solution the same way the browser widget does.
+
+    `challenge` is the JSON body of GET /api/altcha/challenge, e.g.
+    {"parameters": {"algorithm": "PBKDF2/SHA-256", "cost": 5000,
+    "keyLength": 32, "keyPrefix": "00", "nonce": "...", "salt": "..."},
+    "signature": "..."}
+
+    CPU-bound — call via run_in_executor from async code.
+    """
+    parameters = challenge["parameters"]
+    nonce_buf = bytes.fromhex(parameters["nonce"])
+    salt_buf = bytes.fromhex(parameters["salt"])
+    key_prefix_buf = bytes.fromhex(parameters["keyPrefix"])
+    cost = parameters["cost"]
+    key_length = parameters.get("keyLength", 32)
+    digest = {
+        "PBKDF2/SHA-512": "sha512",
+        "PBKDF2/SHA-384": "sha384",
+    }.get(parameters["algorithm"], "sha256")
+
+    counter = 0
+    while True:
+        password = nonce_buf + counter.to_bytes(4, byteorder="big")
+        derived = hashlib.pbkdf2_hmac(digest, password, salt_buf, cost, dklen=key_length)
+        if derived.startswith(key_prefix_buf):
+            solution = {"counter": counter, "derivedKey": derived.hex(), "time": 0}
+            break
+        counter += 1
+
+    payload = {
+        "challenge": {
+            "parameters": parameters,
+            "signature": challenge["signature"],
+        },
+        "solution": solution,
+    }
+    return base64.b64encode(
+        json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    ).decode("utf-8")
 
 
 def get_realm(brand: str, country: str | None = None) -> str:
@@ -124,13 +174,28 @@ class VaillantAuth:
             )
         login_url = html_lib.unescape(match.group(1))
 
+        login_data = {
+            "username": self._username,
+            "password": self._password,
+            "credentialId": "",
+        }
+        try:
+            async with self._session.get(
+                ALTCHA_CHALLENGE_URL, timeout=AUTH_TIMEOUT
+            ) as resp:
+                if resp.status == 200:
+                    challenge = await resp.json()
+                    login_data["altcha"] = await asyncio.get_running_loop(
+                    ).run_in_executor(None, solve_altcha_challenge, challenge)
+        except Exception:
+            _LOGGER.debug(
+                "Could not fetch or solve ALTCHA challenge, continuing without it",
+                exc_info=True,
+            )
+
         async with self._session.post(
             login_url,
-            data={
-                "username": self._username,
-                "password": self._password,
-                "credentialId": "",
-            },
+            data=login_data,
             allow_redirects=False,
             timeout=AUTH_TIMEOUT,
         ) as resp:
