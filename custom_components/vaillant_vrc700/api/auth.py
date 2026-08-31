@@ -44,6 +44,14 @@ class AuthenticationError(Exception):
     """Raised when login or token refresh fails."""
 
 
+class AuthServerError(AuthenticationError):
+    """Raised when the identity server itself fails (5xx) — transient, retry later.
+
+    Subclasses AuthenticationError so existing broad handlers still catch it,
+    but callers can treat it as retryable instead of bad credentials.
+    """
+
+
 def solve_altcha_challenge(challenge: dict) -> str:
     """Solve the ALTCHA proof-of-work challenge served by Vaillant's login page.
 
@@ -159,6 +167,11 @@ class VaillantAuth:
         async with self._session.get(
             auth_url, params=params, timeout=AUTH_TIMEOUT
         ) as resp:
+            if resp.status >= 500:
+                raise AuthServerError(
+                    f"Keycloak auth page returned HTTP {resp.status} "
+                    "(identity server problem, retry later)"
+                )
             if resp.status != 200:
                 raise AuthenticationError(
                     f"Keycloak auth page returned HTTP {resp.status} "
@@ -200,6 +213,11 @@ class VaillantAuth:
             timeout=AUTH_TIMEOUT,
         ) as resp:
             location = resp.headers.get("Location", "")
+            if resp.status >= 500:
+                raise AuthServerError(
+                    f"Credentials POST returned HTTP {resp.status} "
+                    "(identity server problem, retry later)"
+                )
             if resp.status != 302 or "code=" not in location:
                 raise AuthenticationError(
                     "Login failed — check username/password "
@@ -233,6 +251,11 @@ class VaillantAuth:
         async with self._session.post(
             token_url, data=data, timeout=AUTH_TIMEOUT
         ) as resp:
+            if resp.status >= 500:
+                raise AuthServerError(
+                    f"Token request returned HTTP {resp.status} "
+                    "(identity server problem, retry later)"
+                )
             if resp.status != 200:
                 body = await resp.text()
                 raise AuthenticationError(

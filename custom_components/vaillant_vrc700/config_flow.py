@@ -12,7 +12,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-from .api import AuthenticationError, VaillantAuth, VRC700Client
+from .api import AuthenticationError, AuthServerError, VaillantAuth, VRC700Client
 from .const import (
     BRANDS,
     CONF_BOOST_DURATION,
@@ -77,6 +77,8 @@ class VRC700ConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 try:
                     self._systems = await self._discover_vrc700_systems(creds)
+                except AuthServerError:
+                    errors["base"] = "cannot_connect"
                 except AuthenticationError:
                     errors["base"] = "invalid_auth"
                 except Exception:  # noqa: BLE001 - surface as connection problem

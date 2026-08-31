@@ -24,7 +24,14 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import ApiError, AuthenticationError, QuotaExceededError, VRC700Client, VRC700System
+from .api import (
+    ApiError,
+    AuthenticationError,
+    AuthServerError,
+    QuotaExceededError,
+    VRC700Client,
+    VRC700System,
+)
 from .const import (
     AUX_FETCH_EVERY_CYCLES,
     CONF_MANUAL_COOLING_DAYS,
@@ -160,6 +167,9 @@ class VRC700Coordinator(DataUpdateCoordinator[VRC700Data]):
                             else str(code)
                         )
                 self._last_codes = codes
+        except AuthServerError as err:
+            # Identity server hiccup (5xx) — transient, retry next cycle.
+            raise UpdateFailed(f"Identity server error: {err}") from err
         except AuthenticationError as err:
             raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
         except QuotaExceededError as err:
